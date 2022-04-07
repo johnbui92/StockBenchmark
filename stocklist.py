@@ -226,6 +226,43 @@ def add_esg_rating():
 
     return stocklist_dict
 
+# ESG Rating Converter
+def esg_rating_converter(unconverted_rating):
+    esg_rating_dict = load_data("esg_rating_dict")
+    rating = esg_rating_dict[unconverted_rating]
+    return rating
+
+# ESG Rating in Zahlen konvertieren und hinzufügen
+def convert_esg_ratings():
+    stocklist_dict = load_data("stocklist_dict")
+    counter = 0
+
+    for symbol in stocklist_dict:
+        counter += 1
+        print(str(counter) + " " + symbol)
+
+        if stocklist_dict[symbol]["ESG"] != "None":
+            environment_grade = stocklist_dict[symbol]["ESG"]["environment_grade"]
+            social_grade = stocklist_dict[symbol]["ESG"]["social_grade"]
+            governance_grade = stocklist_dict[symbol]["ESG"]["governance_grade"]
+            total_grade = stocklist_dict[symbol]["ESG"]["total_grade"]
+
+            environment_grade_converted = esg_rating_converter(environment_grade)
+            social_grade_converted = esg_rating_converter(social_grade)
+            governance_grade_converted = esg_rating_converter(governance_grade)
+            total_grade_converted = esg_rating_converter(total_grade)
+
+            stocklist_dict[symbol]["ESG"]["environment_grade_converted"] = environment_grade_converted
+            stocklist_dict[symbol]["ESG"]["social_grade_converted"] = social_grade_converted
+            stocklist_dict[symbol]["ESG"]["governance_grade_converted"] = governance_grade_converted
+            stocklist_dict[symbol]["ESG"]["total_grade_converted"] = total_grade_converted
+
+        # if counter == 1:
+        #     break
+
+    return stocklist_dict
+
+
 # stocklist_dict = get_basic_nasdaq_info()
 # save_data(stocklist_dict, "stocklist_dict")
 
@@ -239,4 +276,7 @@ def add_esg_rating():
 # save_data(stocklist_dict, "stocklist_dict")
 
 # stocklist_dict = add_esg_rating()
+
+# stocklist_dict = convert_esg_ratings()
 # save_data(stocklist_dict, "stocklist_dict")
+

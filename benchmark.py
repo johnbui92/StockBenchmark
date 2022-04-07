@@ -8,12 +8,20 @@ from collections import defaultdict
 
 # API nutzen, um Daten für die Benchmark zu sammeln
 def get_stockdata():
-    stocklist_dict = load_data("stocklist_dict")
-    stockdata_dict = stocklist_dict.copy()
+    stockdata_dict = load_data("stockdata_dict")
+    # stockdata_dict = stocklist_dict.copy()
     counter = 0
+    counter2 = 0
+    counter3 = 1
     for symbol in stockdata_dict:
         counter += 1
+        counter2 += 1
         print(str(counter) + " | " + symbol + ": " + stockdata_dict[symbol]["Name"])
+
+        # # Falls Run abgebrochen wurde wegen Fehler
+        # if counter < 1599:
+        #     continue
+
         stockdata_dict[symbol]["FinancialData"] = {}
         stockdata_dict[symbol]["FinancialData"]["CompanyOverview"] = {}
         stockdata_dict[symbol]["FinancialData"]["BalanceSheet"] = {}
@@ -21,9 +29,11 @@ def get_stockdata():
 
         # Daten von "Company Overview" holen
         url = 'https://www.alphavantage.co/query?function=OVERVIEW&symbol={0}&apikey=MGRYIUKL7JKXZH2V'.format(symbol)
+        # print("request " + str(counter3))
+        # counter3 += 1
         r = requests.get(url)
         data = r.json()
-        time.sleep(0.2)
+        # time.sleep(0.001)
         for entry in data:
             stockdata_dict[symbol]["FinancialData"]["CompanyOverview"]["AnalystTargetPrice"] = data["AnalystTargetPrice"]
             stockdata_dict[symbol]["FinancialData"]["CompanyOverview"]["Beta"] = data["Beta"]
@@ -54,9 +64,11 @@ def get_stockdata():
 
         # Daten von "Balance Sheet" holen
         url = 'https://www.alphavantage.co/query?function=BALANCE_SHEET&symbol={0}&apikey=MGRYIUKL7JKXZH2V'.format(symbol)
+        # print("request " + str(counter3))
+        # counter3 += 1
         r = requests.get(url)
         data = r.json()
-        time.sleep(0.2)
+        time.sleep(0.001)
         for entry in data:
             if data["annualReports"] != []:
                 stockdata_dict[symbol]["FinancialData"]["BalanceSheet"]["totalCurrentAssets"] = data["annualReports"][0]["totalCurrentAssets"]
@@ -80,9 +92,11 @@ def get_stockdata():
 
         # Daten von "Cash Flow" holen
         url = 'https://www.alphavantage.co/query?function=CASH_FLOW&symbol={0}&apikey=MGRYIUKL7JKXZH2V'.format(symbol)
+        # print("request " + str(counter3))
+        # counter3 += 1
         r = requests.get(url)
         data = r.json()
-        time.sleep(0.2)
+        time.sleep(0.001)
         for entry in data:
             if data["annualReports"] != []:
                 stockdata_dict[symbol]["FinancialData"]["Cashflow"]["cashflowFromFinancing"] = data["annualReports"][0]["cashflowFromFinancing"]
@@ -94,16 +108,15 @@ def get_stockdata():
             else:
                 stockdata_dict[symbol]["FinancialData"]["Cashflow"] = "None"
 
+        if counter2 >= 100:
+            save_data(stockdata_dict, "stockdata_dict")
+            print("saved" + ("*" * 100))
+            counter2 = 0
+
         # if counter == 1:
         #     break
 
     return stockdata_dict
-
-# ESG Rating Converter
-def esg_rating_converter(unconverted_rating):
-    esg_rating_dict = load_data("esg_rating_dict")
-    rating = esg_rating_dict[unconverted_rating]
-    return rating
 
 # Gesammelte Daten für Aktie "X" benchmarken
 def benchmark_stock(current_symbol):
@@ -281,7 +294,6 @@ def stock_price(symbol):
     return stock_price
 
 # stockdata_dict = get_stockdata()
-# save_data(stockdata_dict, "stockdata_dict")
 
 # benchmark_dict = benchmark_stock("GOOG")
 
