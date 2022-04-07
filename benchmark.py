@@ -8,7 +8,7 @@ from collections import defaultdict
 
 # API nutzen, um Daten für die Benchmark zu sammeln
 def get_stockdata():
-    stocklist_dict = load_data("stocklist_dict_cleaned")
+    stocklist_dict = load_data("stocklist_dict")
     stockdata_dict = stocklist_dict.copy()
     counter = 0
     for symbol in stockdata_dict:
@@ -72,7 +72,7 @@ def get_stockdata():
 
                 if total_assets != "None" and total_liabilities != "None":
                     equity = float(total_assets) - float(total_liabilities)
-                    stockdata_dict[symbol]["FinancialData"]["BalanceSheet"]["totalEquity"] = equity
+                    stockdata_dict[symbol]["FinancialData"]["BalanceSheet"]["totalEquity"] = str(equity)
                 else:
                     stockdata_dict[symbol]["FinancialData"]["BalanceSheet"]["totalEquity"] = "None"
             else:
@@ -99,6 +99,12 @@ def get_stockdata():
 
     return stockdata_dict
 
+# ESG Rating Converter
+def esg_rating_converter(unconverted_rating):
+    esg_rating_dict = load_data("esg_rating_dict")
+    rating = esg_rating_dict[unconverted_rating]
+    return rating
+
 # Gesammelte Daten für Aktie "X" benchmarken
 def benchmark_stock(current_symbol):
     stockdata_dict = load_data("stockdata_dict")
@@ -107,147 +113,176 @@ def benchmark_stock(current_symbol):
         for ratio in stockdata_dict[current_symbol]["FinancialData"][category]:
             benchmark_dict[ratio] = {}
 
-    # Benchmark: Industry (Branche) ############################################################################
+    # Benchmark: Sektor (Sector) ####################################################################
+    current_sector = stockdata_dict[current_symbol]["Sector"]
+    # Leere Dictionaries und Listen anlegen
+    for category in stockdata_dict[current_symbol]["FinancialData"]:
+        for ratio in stockdata_dict[current_symbol]["FinancialData"][category]:
+            benchmark_dict[ratio]["Sector"] = {}
+            benchmark_dict[ratio]["Sector"]["AllRatios"] = {}
+            benchmark_dict[ratio]["Sector"]["AllRatiosList"] = []
+    # Kennzahlen von allen Aktien derselben Branche holen
+    for symbol in stockdata_dict:
+        if stockdata_dict[symbol]["Sector"] == current_sector:
+            print("-" * 100)
+            print(symbol)
+            # Daten von FinancialData holen
+            for category in stockdata_dict[symbol]["FinancialData"]:
+                # Nur weiter machen, wenn Daten in der Kategorie vorhanden sind
+                if stockdata_dict[symbol]["FinancialData"][category] != "None":
+                    for ratio in stockdata_dict[symbol]["FinancialData"][category]:
+                        ratio_value = stockdata_dict[symbol]["FinancialData"][category][ratio]
+                        print(ratio + ": " + str(ratio_value))
+                        # Wenn Kennzahl nicht vorhanden → wird nicht in die Benchmark aufgenommen
+                        if ratio_value == "None" or ratio_value == "-":
+                            print("Nicht aufgenommen: " + ratio + ": " + ratio_value)
+                        else:
+                            benchmark_dict[ratio]["Sector"]["AllRatios"][symbol] = float(ratio_value)
+                            all_ratios = benchmark_dict[ratio]["Sector"]["AllRatiosList"]
+                            all_ratios.append(float(ratio_value))
+                else:
+                    print("Leer: " + category)
+            # Daten von ESG holen
+            if "ESG" in stockdata_dict[symbol]:
+                benchmark_dict[ratio]["Sector"]["AllRatings"][symbol]["environment_grade"] = stockdata_dict[symbol]["ESG"]["environment_grade"]
+            else:
+                print("ESG leer: " + symbol)
+
+    # FinancialData: Gesammelten Kennzahlen werden im Durchschnitt genommen
+    for category in stockdata_dict[symbol]["FinancialData"]:
+        for ratio in stockdata_dict[symbol]["FinancialData"][category]:
+            all_ratios = benchmark_dict[ratio]["Sector"]["AllRatiosList"]
+            if all_ratios != []:
+                benchmark_dict[ratio]["Sector"]["Benchmark"] = statistics.mean(all_ratios)
+            else:
+                print("Leere Kennzahl: " + ratio)
+
+    # Benchmark: Sektor und ähnliche Martkkapitalisierung (Sector and Size) #########################################
+    current_sector = stockdata_dict[current_symbol]["Sector"]
+    current_size = stockdata_dict[current_symbol]["Size"]
+    # Leere Dictionaries und Listen anlegen
+    for category in stockdata_dict[current_symbol]["FinancialData"]:
+        for ratio in stockdata_dict[current_symbol]["FinancialData"][category]:
+            benchmark_dict[ratio]["SectorAndSize"] = {}
+            benchmark_dict[ratio]["SectorAndSize"]["AllRatios"] = {}
+            benchmark_dict[ratio]["SectorAndSize"]["AllRatiosList"] = []
+    # Kennzahlen von allen Aktien derselben Branche holen
+    for symbol in stockdata_dict:
+        if stockdata_dict[symbol]["Sector"] == current_sector and stockdata_dict[symbol]["Size"] == current_size:
+            print("-" * 100)
+            print(symbol)
+            for category in stockdata_dict[symbol]["FinancialData"]:
+                # Nur weiter machen, wenn Daten in der Kategorie vorhanden sind
+                if stockdata_dict[symbol]["FinancialData"][category] != "None":
+                    for ratio in stockdata_dict[symbol]["FinancialData"][category]:
+                        ratio_value = stockdata_dict[symbol]["FinancialData"][category][ratio]
+                        print(ratio + ": " + str(ratio_value))
+                        # Wenn Kennzahl nicht vorhanden → wird nicht in die Benchmark aufgenommen
+                        if ratio_value == "None" or ratio_value == "-":
+                            print("Nicht aufgenommen: " + ratio + ": " + ratio_value)
+                        else:
+                            benchmark_dict[ratio]["SectorAndSize"]["AllRatios"][symbol] = float(ratio_value)
+                            all_ratios = benchmark_dict[ratio]["SectorAndSize"]["AllRatiosList"]
+                            all_ratios.append(float(ratio_value))
+                else:
+                    print("Leer: " + category)
+    # Gesammelten Kennzahlen werden im Durchschnitt genommen
+    for category in stockdata_dict[symbol]["FinancialData"]:
+        for ratio in stockdata_dict[symbol]["FinancialData"][category]:
+            all_ratios = benchmark_dict[ratio]["SectorAndSize"]["AllRatiosList"]
+            if all_ratios != []:
+                benchmark_dict[ratio]["SectorAndSize"]["Benchmark"] = statistics.mean(all_ratios)
+            else:
+                print("Leere Kennzahl: " + ratio)
+
+    # Benchmark: Branche (Industry) ##################################################################
     current_industry = stockdata_dict[current_symbol]["Industry"]
+    # Leere Dictionaries und Listen anlegen
     for category in stockdata_dict[current_symbol]["FinancialData"]:
         for ratio in stockdata_dict[current_symbol]["FinancialData"][category]:
             benchmark_dict[ratio]["Industry"] = {}
             benchmark_dict[ratio]["Industry"]["AllRatios"] = {}
             benchmark_dict[ratio]["Industry"]["AllRatiosList"] = []
+    # Kennzahlen von allen Aktien derselben Branche holen
     for symbol in stockdata_dict:
         if stockdata_dict[symbol]["Industry"] == current_industry:
             print("-" * 100)
             print(symbol)
             for category in stockdata_dict[symbol]["FinancialData"]:
-                for ratio in stockdata_dict[symbol]["FinancialData"][category]:
-                    ratio_value = stockdata_dict[symbol]["FinancialData"][category][ratio]
-                    print(ratio + ": " + str(ratio_value))
-                    if ratio_value == "None" or ratio_value == "-":
-                        print("Nicht aufgenommen: " + ratio + ": " + ratio_value)
-                    else:
-                        benchmark_dict[ratio]["Industry"]["AllRatios"][symbol] = float(ratio_value)
-                        all_ratios = benchmark_dict[ratio]["Industry"]["AllRatiosList"]
-                        all_ratios.append(float(ratio_value))
+                # Nur weiter machen, wenn Daten in der Kategorie vorhanden sind
+                if stockdata_dict[symbol]["FinancialData"][category] != "None":
+                    for ratio in stockdata_dict[symbol]["FinancialData"][category]:
+                        ratio_value = stockdata_dict[symbol]["FinancialData"][category][ratio]
+                        print(ratio + ": " + str(ratio_value))
+                        # Wenn Kennzahl nicht vorhanden → wird nicht in die Benchmark aufgenommen
+                        if ratio_value == "None" or ratio_value == "-":
+                            print("Nicht aufgenommen: " + ratio + ": " + ratio_value)
+                        else:
+                            benchmark_dict[ratio]["Industry"]["AllRatios"][symbol] = float(ratio_value)
+                            all_ratios = benchmark_dict[ratio]["Industry"]["AllRatiosList"]
+                            all_ratios.append(float(ratio_value))
+                else:
+                    print("Leer: " + category)
+    # Gesammelten Kennzahlen werden im Durchschnitt genommen
     for category in stockdata_dict[symbol]["FinancialData"]:
         for ratio in stockdata_dict[symbol]["FinancialData"][category]:
             all_ratios = benchmark_dict[ratio]["Industry"]["AllRatiosList"]
-            benchmark_dict[ratio]["Industry"]["Benchmark"] = statistics.mean(all_ratios)
+            if all_ratios != []:
+                benchmark_dict[ratio]["Industry"]["Benchmark"] = statistics.mean(all_ratios)
+            else:
+                print("Leere Kennzahl: " + ratio)
 
-    # Benchmark: Industry und Size (Branche und ähnliche Marktkapitalisierung) #################################
+    # Benchmark: Branche und ähnliche Martkkapitalisierung (Industry and Size) #########################################
     current_industry = stockdata_dict[current_symbol]["Industry"]
     current_size = stockdata_dict[current_symbol]["Size"]
+    # Leere Dictionaries und Listen anlegen
     for category in stockdata_dict[current_symbol]["FinancialData"]:
         for ratio in stockdata_dict[current_symbol]["FinancialData"][category]:
             benchmark_dict[ratio]["IndustryAndSize"] = {}
             benchmark_dict[ratio]["IndustryAndSize"]["AllRatios"] = {}
             benchmark_dict[ratio]["IndustryAndSize"]["AllRatiosList"] = []
+    # Kennzahlen von allen Aktien derselben Branche holen
     for symbol in stockdata_dict:
         if stockdata_dict[symbol]["Industry"] == current_industry and stockdata_dict[symbol]["Size"] == current_size:
             print("-" * 100)
             print(symbol)
             for category in stockdata_dict[symbol]["FinancialData"]:
-                for ratio in stockdata_dict[symbol]["FinancialData"][category]:
-                    ratio_value = stockdata_dict[symbol]["FinancialData"][category][ratio]
-                    print(ratio + ": " + str(ratio_value))
-                    if ratio_value == "None" or ratio_value == "-":
-                        print("Nicht aufgenommen: " + ratio + ": " + ratio_value)
-                    else:
-                        benchmark_dict[ratio]["IndustryAndSize"]["AllRatios"][symbol] = float(ratio_value)
-                        all_ratios = benchmark_dict[ratio]["IndustryAndSize"]["AllRatiosList"]
-                        all_ratios.append(float(ratio_value))
+                # Nur weiter machen, wenn Daten in der Kategorie vorhanden sind
+                if stockdata_dict[symbol]["FinancialData"][category] != "None":
+                    for ratio in stockdata_dict[symbol]["FinancialData"][category]:
+                        ratio_value = stockdata_dict[symbol]["FinancialData"][category][ratio]
+                        print(ratio + ": " + str(ratio_value))
+                        # Wenn Kennzahl nicht vorhanden → wird nicht in die Benchmark aufgenommen
+                        if ratio_value == "None" or ratio_value == "-":
+                            print("Nicht aufgenommen: " + ratio + ": " + ratio_value)
+                        else:
+                            benchmark_dict[ratio]["Industry"]["AllRatios"][symbol] = float(ratio_value)
+                            all_ratios = benchmark_dict[ratio]["Industry"]["AllRatiosList"]
+                            all_ratios.append(float(ratio_value))
+                else:
+                    print("Leer: " + category)
+    # Gesammelten Kennzahlen werden im Durchschnitt genommen
     for category in stockdata_dict[symbol]["FinancialData"]:
         for ratio in stockdata_dict[symbol]["FinancialData"][category]:
             all_ratios = benchmark_dict[ratio]["IndustryAndSize"]["AllRatiosList"]
             if all_ratios != []:
                 benchmark_dict[ratio]["IndustryAndSize"]["Benchmark"] = statistics.mean(all_ratios)
             else:
-                benchmark_dict[ratio]["IndustryAndSize"]["Benchmark"] = "None"
-
-    # # Benchmark: Sector (Wirtschaftszweige) ############################################################################
-    # current_sector = stockdata_dict[current_symbol]["Sector"]
-    # benchmark_dict = defaultdict(float)
-    # benchmark_dict["Sector"] = {}
-    # # Leere Dictionaries und Listen für jede Kennzahl anlegen
-    # for category in stockdata_dict[current_symbol]["FinancialData"]:
-    #     benchmark_dict["Sector"][category]= {}
-    #     for ratio in stockdata_dict[current_symbol]["FinancialData"][category]:
-    #         benchmark_dict["Sector"][category][ratio] = {}
-    #         benchmark_dict["Sector"][category][ratio]["AllRatios"] = {}
-    #         benchmark_dict["Sector"][category][ratio]["AllRatiosList"] = []
-    # for symbol in stockdata_dict:
-    #     # Nur Aktien im gleichen Sektor nehmen
-    #     if stockdata_dict[symbol]["Sector"] == current_sector and symbol != current_symbol:
-    #         print("-" * 100)
-    #         print(symbol)
-    #         for category in stockdata_dict[symbol]["FinancialData"]:
-    #             category_value = stockdata_dict[symbol]["FinancialData"][category]
-    #             # Schleife soll abgebrochen werden, wenn in der Kategorie keine Daten zu finden sind
-    #             if category_value == "None":
-    #                 continue
-    #             else:
-    #                 for ratio in stockdata_dict[symbol]["FinancialData"][category]:
-    #                     ratio_value = stockdata_dict[symbol]["FinancialData"][category][ratio]
-    #                     print(ratio + ": " + str(ratio_value))
-    #                     # Wenn Kennzahl leer ist, soll diese nicht mit einbezogen werden
-    #                     if ratio_value == "None" or ratio_value == "-":
-    #                         print("Nicht aufgenommen: " + ratio + ": " + ratio_value)
-    #                     # Kennzahl wird in das Dict eingetragen
-    #                     else:
-    #                         benchmark_dict["Sector"][category][ratio]["AllRatios"][symbol] = float(ratio_value)
-    #                         benchmark = benchmark_dict["Sector"][category][ratio]["AllRatiosList"]
-    #                         benchmark.append(float(ratio_value))
-    # # Durchschnitt von allen gesammelten Kennzahlen berechnen und ins Dict eintragen
-    # for category in stockdata_dict[symbol]["FinancialData"]:
-    #     for ratio in stockdata_dict[symbol]["FinancialData"][category]:
-    #         all_ratios = benchmark_dict["Sector"][category][ratio]["AllRatiosList"]
-    #         benchmark_dict["Sector"][category][ratio]["Benchmark"] = statistics.mean(all_ratios)
-
-
-    # # Benchmark: Industry (Branche) ############################################################################
-    # current_industry = stockdata_dict[current_symbol]["Industry"]
-    # # benchmark_dict = defaultdict(float)
-    # benchmark_dict["Industry"] = {}
-    # # Leere Dictionaries und Listen für jede Kennzahl anlegen
-    # for category in stockdata_dict[current_symbol]["FinancialData"]:
-    #     benchmark_dict["Industry"][category]= {}
-    #     for ratio in stockdata_dict[current_symbol]["FinancialData"][category]:
-    #         benchmark_dict["Industry"][category][ratio] = {}
-    #         benchmark_dict["Industry"][category][ratio]["AllRatios"] = {}
-    #         benchmark_dict["Industry"][category][ratio]["AllRatiosList"] = []
-    # for symbol in stockdata_dict:
-    #     # Nur Aktien in der gleichen Brache nehmen
-    #     if stockdata_dict[symbol]["Industry"] == current_industry and symbol != current_symbol:
-    #         print("-" * 100)
-    #         print(symbol)
-    #         for category in stockdata_dict[symbol]["FinancialData"]:
-    #             category_value = stockdata_dict[symbol]["FinancialData"][category]
-    #             # Schleife soll abgebrochen werden, wenn in der Kategorie keine Daten zu finden sind
-    #             if category_value == "None":
-    #                 continue
-    #             else:
-    #                 for ratio in stockdata_dict[symbol]["FinancialData"][category]:
-    #                     ratio_value = stockdata_dict[symbol]["FinancialData"][category][ratio]
-    #                     print(ratio + ": " + str(ratio_value))
-    #                     # Wenn Kennzahl leer ist, soll diese nicht mit einbezogen werden
-    #                     if ratio_value == "None" or ratio_value == "-":
-    #                         print("Nicht aufgenommen: " + ratio + ": " + ratio_value)
-    #                     # Kennzahl wird in das Dict eingetragen
-    #                     else:
-    #                         benchmark_dict["Industry"][category][ratio]["AllRatios"][symbol] = float(ratio_value)
-    #                         benchmark = benchmark_dict["Industry"][category][ratio]["AllRatiosList"]
-    #                         benchmark.append(float(ratio_value))
-    # # Durchschnitt von allen gesammelten Kennzahlen berechnen und ins Dict eintragen
-    # for category in stockdata_dict[symbol]["FinancialData"]:
-    #     for ratio in stockdata_dict[symbol]["FinancialData"][category]:
-    #         all_ratios = benchmark_dict["Industry"][category][ratio]["AllRatiosList"]
-    #         benchmark_dict["Industry"][category][ratio]["Benchmark"] = statistics.mean(all_ratios)
+                print("Leere Kennzahl: " + ratio)
 
     return benchmark_dict
 
+# Aktueller Preis für jeweilige Aktie holen
+def stock_price(symbol):
+    url = f'https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey=MGRYIUKL7JKXZH2V'
+    r = requests.get(url)
+    data = r.json()
+    stock_price = data["Global Quote"]["05. price"]
+    return stock_price
 
 # stockdata_dict = get_stockdata()
 # save_data(stockdata_dict, "stockdata_dict")
 
-# industry_benchmark_dict = benachmark_stock("A")
+# benchmark_dict = benchmark_stock("GOOG")
 
-benchmark_dict = benchmark_stock("GOOG")
+# stock_price("GOOG")

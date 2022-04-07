@@ -4,6 +4,7 @@ import pickle
 from collections import defaultdict
 import requests
 import pprint
+import json
 
 # Speicher: Datenbank
 def save_data(data, data_str):
@@ -114,7 +115,12 @@ def clean_stocklist_dict():
         print("-" * 100)
         print(symbol)
         # Einträge ohne Treffer löschen
-        if len(stocklist_dict[symbol]) <= 3:
+        if stocklist_dict[symbol] == 0:
+            del stocklist_dict_temp[symbol]
+            print("delete: " + symbol)
+            deleted.append(symbol)
+            continue
+        elif len(stocklist_dict[symbol]) <= 3:
             del stocklist_dict_temp[symbol]
             print("delete: " + symbol)
             deleted.append(symbol)
@@ -171,6 +177,54 @@ def clean_stocklist_dict():
     stocklist_dict = stocklist_dict_temp
     return stocklist_dict
 
+# ESG Rating für alle Aktien hinzufügen
+def add_esg_rating():
+    stocklist_dict = load_data("stocklist_dict")
+    counter = 0
+
+    for symbol in stocklist_dict:
+        print("-" * 100)
+        print(str(counter) + " " + symbol)
+        counter += 1
+
+        # Schleifer fortfahren
+        if counter < 6151:
+            continue
+
+        # Daten von API holen
+        url = "https://esg-environmental-social-governance-data.p.rapidapi.com/search"
+        querystring = {"q": symbol}
+        headers = {
+            "X-RapidAPI-Host": "esg-environmental-social-governance-data.p.rapidapi.com",
+            "X-RapidAPI-Key": "5e1447055fmshd217b6d846bbd7ap16f677jsn1e60f29bea63"
+        }
+        response = requests.request("GET", url, headers=headers, params=querystring)
+        time.sleep(1)
+        data = response.text
+        # Nächstes Symbol, falls data leer
+        if data == "[]":
+            print("Leer: " + symbol)
+            stocklist_dict[symbol]["ESG"] = "None"
+            continue
+            print("wtf")
+        else:
+            data = json.loads(data)[0]
+            if "company_name" in data:
+                del data["company_name"]
+            if "exchange_symbol" in data:
+                del data["exchange_symbol"]
+            if "stock_symbol" in data:
+                del data["stock_symbol"]
+            if "disclaimer" in data:
+                del data["disclaimer"]
+            print(data)
+            # Daten dem Dict zuordnen
+            stocklist_dict[symbol]["ESG"] = data
+
+        save_data(stocklist_dict, "stocklist_dict")
+        print("saved")
+
+    return stocklist_dict
 
 # stocklist_dict = get_basic_nasdaq_info()
 # save_data(stocklist_dict, "stocklist_dict")
@@ -184,5 +238,5 @@ def clean_stocklist_dict():
 # stocklist_dict = clean_stocklist_dict()
 # save_data(stocklist_dict, "stocklist_dict")
 
-test3 = load_data("stocklist_dict")
-print("Hallo")
+# stocklist_dict = add_esg_rating()
+# save_data(stocklist_dict, "stocklist_dict")
